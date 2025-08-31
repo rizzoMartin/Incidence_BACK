@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Depends, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from app.models import AnalyzeIn, AnalyzeOut, Sentiment, Urgency, ChatRequest, ChatResponse
 from app.db import SessionLocal, Task, ChatMessage
 from openai import OpenAI
@@ -9,6 +10,19 @@ import os
 load_dotenv()
 
 app = FastAPI()
+
+origins = [
+    "http://localhost:5173"
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 # Inicializa el cliente con tu API Key (ya configurada en variable de entorno)
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -27,6 +41,8 @@ async def root():
 @app.get("/tasks")
 async def get_tasks(db=Depends(get_db)):
     tasks = db.query(Task).all()
+    for tsk in tasks:
+        print(f"Task {tsk.id}: {tsk.solicitud} - {tsk.sentiment} - {tsk.urgency} - Tags: {tsk.tags}")
     return [
         {
             "id": task.id,
@@ -180,6 +196,8 @@ async def chat_incidencia(id: int, chat: ChatRequest, db=Depends(get_db)):
 async def get_chat_incidencia(id: int, db=Depends(get_db)):
     # Recupera los mensajes de chat asociados a la incidencia, ordenados por timestamp
     messages = db.query(ChatMessage).filter(ChatMessage.incidencia_id == id).order_by(ChatMessage.timestamp).all()
+    for msg in messages:
+        print(f"[{msg.timestamp}] {msg.role}: {msg.content}")
     # Devuelve una lista de mensajes con rol y contenido
     return [
         {"role": msg.role, "content": msg.content, "timestamp": msg.timestamp.isoformat()} for msg in messages
